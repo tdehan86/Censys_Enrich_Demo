@@ -1,7 +1,13 @@
 #!/bin/bash
+#which sysctl || echo "sysctl introuvable"
+# Activer le forwarding IP
 sysctl -w net.ipv4.ip_forward=1
+
+# Activer le NAT pour router le trafic vers l'extérieur
 iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-iptables -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT
-iptables -A FORWARD -s 10.10.10.0/24 -j ACCEPT
-tail -f /dev/null  # Pour garder le conteneur actif
+
+# Loguer uniquement les paquets sortants vers Internet
+iptables -A FORWARD -o eth0 -j ULOG --log-prefix "FW_OUT: " --log-level 4
+dmesg -w
+# Garder le conteneur actif
+tail -f /dev/null
