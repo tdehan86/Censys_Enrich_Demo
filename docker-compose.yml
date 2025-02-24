@@ -1,0 +1,26 @@
+version: "3.8"
+
+networks:
+  firewalled-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.10.0/24
+
+services:
+  firewall:
+    build: ./firewall
+    cap_add:
+      - NET_ADMIN
+    networks:
+      firewalled-net:
+        ipv4_address: 10.10.10.1
+
+  server:
+    build: ./server
+    networks:
+      firewalled-net:
+        ipv4_address: 10.10.10.2
+    depends_on:
+      - firewall
+    entrypoint: ["sh", "-c", "ip route add default via 10.10.10.1"]
