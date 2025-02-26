@@ -1,48 +1,48 @@
+import sqlite3
 import random
 import time
 import logging
 from datetime import datetime
-import ipaddress
-import requests
 
+# Configuration du logger
 logging.basicConfig(filename='firewall.log', level=logging.INFO,
                     format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-src_ips = [f'192.168.1.{i}' for i in range(1, 255)]
-ports = [80, 443] + list(range(1, 65536))
-protocols = ['TCP', 'UDP']
+# Connexion à la base de données SQLite
+conn = sqlite3.connect('censys_data.db')
+cursor = conn.cursor()
 
-def generate_public_ip():
-    while True:
-        ip = ipaddress.IPv4Address(random.randint(1, 2**32 - 1))
-        if not ip.is_private:
-            return str(ip)
+def get_random_internal_ip():
+    return f"192.168.1.{random.randint(1, 254)}"
 
-def get_country(ip):
-    try:
-        response = requests.get(f'http://ip-api.com/json/{ip}')
-        data = response.json()
-        return data['country']
-    except:
-        return 'Unknown'
+def get_random_host():
+    cursor.execute("SELECT * FROM hosts ORDER BY RANDOM() LIMIT 1")
+    return cursor.fetchone()
 
 def generate_log_entry():
-    src_ip = random.choice(src_ips)
-    dst_ip = generate_public_ip()
-    src_port = random.randint(1024, 65535)
+    src_ip = get_random_internal_ip()
+    host = get_random_host()
+    if not host:
+        return  # Si aucun hôte n'est trouvé dans la base de données
+
+    dst_ip, country, ports = host
+    ports_list = ports.split(',') if ports else []
     
-    if random.random() < 0.8:
-        dst_port = random.choice([80, 443])
+    if ports_list:
+        dst_port = random.choice(ports_list)
     else:
-        dst_port = random.choice(ports)
+        dst_port = random.randint(1, 65535)
     
-    protocol = random.choice(protocols)
+    src_port = random.randint(1024, 65535)
+    protocol = random.choice(['TCP', 'UDP'])
     action = random.choice(['ALLOW', 'BLOCK'])
-    country = get_country(dst_ip)
     
     log_message = f"SRC={src_ip}:{src_port} DST={dst_ip}:{dst_port} PROTO={protocol} ACTION={action} COUNTRY={country}"
     logging.info(log_message)
 
+# Générer des logs
 while True:
     generate_log_entry()
-    time.sleep(random.uniform(0.1, 1.0))
+    time.sleep(random.uniform(0.1, 1.0))  # Pause aléatoire entre 0.1 et 1 seconde
+
+conn.close()
